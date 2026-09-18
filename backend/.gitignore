@@ -1,0 +1,4 @@
+
+# Local uploaded files and temporary PDF tests
+media/
+test_pdf_processor.py
