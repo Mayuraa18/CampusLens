@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import include, path
-
+from .views import HealthCheckView
+from .admin_views import LogDownloadView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -8,6 +9,18 @@ from rest_framework_simplejwt.views import (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+
+    path(
+        "api/admin/logs/download/",
+        LogDownloadView.as_view(),
+        name="log-download",
+    ),
+
+    path(
+        "api/health/",
+        HealthCheckView.as_view(),
+        name="health-check",
+    ),
 
     path("api/", include("documents.urls")),
     path("api/", include("conversations.urls")),
