@@ -39,3 +39,24 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title
+
+class DocumentPage(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="pages",
+    )
+    page_number = models.PositiveIntegerField()
+    text = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["page_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["document", "page_number"],
+                name="unique_document_page",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.document.title} - Page {self.page_number}"
