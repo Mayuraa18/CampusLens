@@ -102,49 +102,65 @@ rather than inventing an answer.
 - [x] Django project
 - [x] Django REST Framework
 - [x] SQLite development database
-- [x] Document model
-- [x] Conversation models
+- [x] Document, page, chunk, deadline, important-date, and action models
+- [x] Conversation and message models
 - [x] User → Document ownership
 - [x] User → Chat ownership
-- [x] Document → Chat relationship
-- [x] Chat → Message relationship
-- [x] Cascade deletion
 - [x] JWT authentication
+- [x] User registration
+- [x] `/api/auth/me/`
 - [x] Protected API endpoints
-- [x] User-specific document filtering
-- [x] Authenticated PDF upload
-- [x] Document retrieval
-- [x] Document deletion
-- [x] `accounts` Django app created
+- [x] PDF upload and validation
+- [x] PDF text extraction with page preservation
+- [x] Document chunking
+- [x] Document processing pipeline
+- [x] Deadline extraction
+- [x] Important-date extraction
+- [x] Required-action extraction
+- [x] Document insights API
+- [x] Lightweight lexical / intent-based retrieval
+- [x] Strands Agent integration
+- [x] Local Ollama model integration
+- [x] Conversational document Q&A
+- [x] Source/page references
+- [x] Chat history and APIs
+- [x] Ownership and security checks
+- [x] Automated pytest suite
 
-### In Progress / Planned
+### Current Test Coverage
 
-- [ ] User registration
-- [ ] `/api/auth/me/`
-- [ ] PDF validation
-- [ ] PDF text extraction
-- [ ] Document processing pipeline
-- [ ] Document chunking
-- [ ] Retrieval
-- [ ] Strands Agent
+```text
+Authentication       3 tests
+Documents            3 tests
+Chats                6 tests
+Security             7 tests
+Chat service         2 tests
+Document processing  2 tests
+──────────────────────────────
+Total               23 tests
+```
+
+All current tests pass:
+
+```text
+23 passed
+```
+
+AI-dependent tests mock the AI service, so Ollama does not need to be running for the automated test suite.
+
+### Next
+
+- [ ] Frontend integration
 - [ ] Amazon Bedrock integration
-- [ ] Deadline extraction
-- [ ] Action extraction
-- [ ] Document Q&A
-- [ ] Source/page references
-- [ ] AI response API
-- [ ] Background processing
-- [ ] Production storage
+- [ ] Amazon S3 integration
+- [ ] Containerized AWS deployment
+- [ ] Production environment
+- [ ] Further retrieval and AI-quality improvements
 
----
 
 # 🎨 Frontend
 
-The frontend can start immediately.
-
-The frontend team **does not need to wait for the AI backend**.
-
-Use mock data wherever the required backend endpoint is not ready.
+The frontend is being developed separately and integrates with the Django REST API.
 
 Planned interface:
 
@@ -155,77 +171,88 @@ Login
 Dashboard
   │
   ├── Upload Document
-  │
   ├── My Documents
   │      │
   │      └── Document
-  │             │
   │             ├── Summary
   │             ├── Deadlines
   │             ├── Required Actions
-  │             ├── Important Information
+  │             ├── Important Dates
   │             └── Ask CampusLens
   │
   └── Chat
 ```
 
-Planned frontend stack:
+Planned stack:
 
 - React
-- HTML
-- Tailwind CSS
 - Vite
 - JavaScript
-- API integration with Django REST Framework
+- Tailwind CSS
+- Django REST Framework API
 
----
 
 # ☁️ AWS / AI
 
-Planned AWS architecture:
+CampusLens is developed locally first and then prepared for AWS deployment.
+
+## Local AI Development
 
 ```text
-                    ┌──────────────┐
-                    │   Frontend   │
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │    Django    │
-                    │     API      │
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────┐
-                    │    Agent     │
-                    │   Strands    │
-                    └──────┬───────┘
-                           │
-                 ┌─────────┴─────────┐
-                 ▼                   ▼
-          ┌─────────────┐     ┌─────────────┐
-          │   Bedrock   │     │ Document    │
-          │    Model    │     │ Retrieval   │
-          └─────────────┘     └──────┬──────┘
-                                     │
-                                     ▼
-                                ┌─────────┐
-                                │   S3    │
-                                └─────────┘
+React / Vite
+     │
+     ▼
+Django REST API
+     │
+     ▼
+Strands Agent
+     │
+     ▼
+Ollama
 ```
 
-Planned AWS services:
+## AWS Target
+
+```text
+                     ┌──────────────┐
+                     │   Frontend   │
+                     └──────┬───────┘
+                            │
+                            ▼
+                     ┌──────────────┐
+                     │ Django API   │
+                     │  Container   │
+                     └──────┬───────┘
+                            │
+                 ┌──────────┴──────────┐
+                 ▼                     ▼
+          ┌──────────────┐      ┌──────────────┐
+          │      S3      │      │   Strands    │
+          │  Documents   │      │    Agent     │
+          └──────────────┘      └──────┬───────┘
+                                       │
+                                       ▼
+                                ┌──────────────┐
+                                │   Bedrock    │
+                                │    Model     │
+                                └──────────────┘
+
+                  Supporting services:
+                    IAM + CloudWatch
+```
+
+Planned AWS components:
 
 - Amazon Bedrock
 - Strands Agents SDK
 - Amazon S3
 - IAM
 - CloudWatch
-- AWS deployment infrastructure
+- Container deployment infrastructure
+- Frontend hosting
 
-Additional AWS services may be introduced if they solve a real project requirement.
+Only services that solve an actual project requirement should be introduced.
 
----
 
 # 🧰 Technology Stack
 
@@ -237,20 +264,18 @@ Additional AWS services may be introduced if they solve a real project requireme
 | Authentication | JWT / Simple JWT |
 | Development Database | SQLite |
 | PDF Extraction | pypdf |
-| Async HTTP | httpx / asyncio |
+| Retrieval | Lightweight lexical / intent-based retrieval |
 | AI Agent | Strands Agents SDK |
-| AI Models | Amazon Bedrock |
+| Local AI Model | Ollama |
+| AWS AI Model | Amazon Bedrock |
 | Object Storage | Amazon S3 |
 | Frontend | React + Vite |
 | Testing | pytest / pytest-django |
 | Linting | Ruff |
 | Version Control | Git + GitHub |
 
-The MVP should avoid unnecessary complexity.
+The MVP intentionally avoids unnecessary infrastructure. Do not add LangChain, LlamaIndex, Redis, Celery, a vector database, or other major components unless they solve an actual requirement.
 
-Do not add frameworks such as LangChain, LlamaIndex, Redis, Celery, vector databases, etc. unless the project actually requires them.
-
----
 
 # 📁 Repository Structure
 
@@ -262,29 +287,31 @@ CampusLens/
 │   ├── config/
 │   ├── documents/
 │   ├── conversations/
+│   ├── scripts/
+│   │   └── test_agent.py
+│   ├── tests/
+│   │   ├── test_auth.py
+│   │   ├── test_documents.py
+│   │   ├── test_chats.py
+│   │   ├── test_security.py
+│   │   ├── test_chat_service.py
+│   │   └── test_document_processing.py
+│   ├── pytest.ini
 │   ├── manage.py
-│   ├── requirements.txt
-│   ├── .env
-│   └── .venv/
+│   └── requirements.txt
 │
 ├── frontend/
-│
-├── tests/
-│
 ├── docs/
 │   ├── API.md
 │   ├── ARCHITECTURE.md
 │   └── TEAM.md
-│
 ├── infrastructure/
-│
 ├── .gitignore
 ├── .env.example
 ├── LICENSE
 └── README.md
 ```
 
----
 
 # 👥 Team Setup
 
@@ -522,8 +549,10 @@ http://127.0.0.1:8000/api/
 ## Authentication
 
 ```text
+POST /api/auth/register/
 POST /api/auth/token/
 POST /api/auth/token/refresh/
+GET  /api/auth/me/
 ```
 
 ## Documents
@@ -533,9 +562,22 @@ GET    /api/documents/
 POST   /api/documents/
 GET    /api/documents/<id>/
 DELETE /api/documents/<id>/
+GET    /api/documents/<id>/insights/
 ```
 
----
+## Chats
+
+```text
+GET    /api/documents/<document_id>/chats/
+POST   /api/documents/<document_id>/chats/
+GET    /api/chats/<id>/
+DELETE /api/chats/<id>/
+GET    /api/chats/<chat_id>/messages/
+POST   /api/chats/<chat_id>/messages/
+```
+
+For complete request and response contracts, see `docs/API.md`.
+
 
 # 📄 Document Upload
 
@@ -577,40 +619,37 @@ This means users can only access their own documents.
 
 ---
 
-# 🧪 Testing the API
+# 🧪 Testing
 
-After obtaining a JWT access token:
+The backend uses pytest and pytest-django.
 
-```http
-Authorization: Bearer <access-token>
+Run the complete suite from `backend/`:
+
+```bash
+pytest -v
 ```
 
-Test:
-
-```http
-GET /api/documents/
-```
-
-Upload:
-
-```http
-POST /api/documents/
-Content-Type: multipart/form-data
-```
-
-Delete:
-
-```http
-DELETE /api/documents/<id>/
-```
-
-A missing or invalid JWT should result in:
+Current coverage:
 
 ```text
-401 Unauthorized
+Authentication       3/3
+Documents            3/3
+Chats                6/6
+Security             7/7
+Chat service         2/2
+Document processing  2/2
+──────────────────────────────
+Total               23/23
 ```
 
----
+Expected result:
+
+```text
+23 passed
+```
+
+The AI service is mocked in AI-dependent tests, so Ollama does not need to be running for the automated suite.
+
 
 # 👨‍💻 Team Responsibilities
 
@@ -928,9 +967,7 @@ Use appropriate AWS/IAM mechanisms for deployed environments.
 
 # 🧠 AI Design
 
-The initial AI architecture should remain simple.
-
-Start with one agent.
+The initial AI architecture uses one agent.
 
 ```text
 User
@@ -942,32 +979,27 @@ Django API
 Strands Agent
  │
  ├── search_document()
- ├── extract_deadlines()
- ├── extract_actions()
- └── explain_section()
+ ├── structured document insights
+ └── conversation history
  │
  ▼
-Amazon Bedrock
+Local: Ollama
+AWS: Amazon Bedrock
  │
  ▼
-Structured Answer
- │
- ├── Summary
- ├── Deadlines
- ├── Actions
- ├── Answer
- └── Sources
+Answer + Sources
 ```
 
-Do not start with a multi-agent architecture.
+The agent should answer from document evidence, preserve source/page references, understand follow-up questions, and avoid unsupported claims.
 
-A single reliable agent is enough for the MVP.
+If the document does not contain enough information, CampusLens should say:
 
----
+```text
+I couldn't find this information in the uploaded document.
+```
+
 
 # 📚 Document Understanding Pipeline
-
-Target pipeline:
 
 ```text
 Upload PDF
@@ -976,22 +1008,27 @@ Validate PDF
     ↓
 Extract Text
     ↓
-Split into Chunks
+Create Document Pages
     ↓
-Retrieve Relevant Content
+Chunk Text
+    ↓
+Extract Deadlines
+    ↓
+Extract Important Dates
+    ↓
+Extract Required Actions
+    ↓
+Persist Structured Data
+    ↓
+Retrieve Relevant Chunks
     ↓
 Strands Agent
     ↓
-Amazon Bedrock
-    ↓
-Structured Response
-    ↓
-Frontend
+AI Answer + Source Pages
 ```
 
-The system should preserve enough document context to provide page/source references.
+The system preserves page numbers throughout processing so that extracted information and AI answers can point back to the original document.
 
----
 
 # 🎯 MVP
 

@@ -8,7 +8,7 @@ This document explains how the team should work on CampusLens during development
 
 ## Backend + AI Agent
 
-**Owner: Naman**
+**Owner: Backend + AI Developer**
 
 Responsibilities:
 
@@ -18,36 +18,65 @@ Responsibilities:
 - Document APIs
 - User ownership
 - PDF processing
+- Document chunking
+- Retrieval
 - Strands Agents SDK
-- Amazon Bedrock
+- Local Ollama integration
+- Amazon Bedrock integration
 - Agent tools
 - AI response API
 - Deadline extraction
+- Important-date extraction
 - Action extraction
+- Document Q&A
 - Source/page references
 
-Current backend foundation is already available.
+### Current Status
 
-Next backend tasks:
+The backend foundation is already available.
+
+Completed:
 
 ```text
-Registration
+Django / DRF
     ↓
-/api/auth/me/
+Authentication
     ↓
-PDF validation
+Document APIs
     ↓
-PDF extraction
+PDF processing
     ↓
-Processing pipeline
+Pages + chunks
+    ↓
+Deadlines
+    ↓
+Important dates
+    ↓
+Required actions
     ↓
 Retrieval
     ↓
 Strands Agent
     ↓
-Bedrock
+Ollama local AI
     ↓
-AI API
+Document Q&A
+    ↓
+Source/page references
+```
+
+Current next tasks:
+
+```text
+Frontend integration
+        ↓
+Bedrock integration
+        ↓
+S3 integration
+        ↓
+AI quality improvements
+        ↓
+Production deployment
 ```
 
 ---
@@ -66,28 +95,42 @@ Responsibilities:
 - Summary
 - Deadlines
 - Required actions
+- Important dates
 - Chat
 - Source/page references
 - Loading states
 - Error states
 - Empty states
+- Backend API integration
 
 ## Start immediately
 
 The frontend does **not** need to wait for the AI backend.
 
-Use mock data for unfinished AI endpoints.
+Use mock data for features that are not yet connected.
 
 Current backend API:
 
 ```text
+POST   /api/auth/register/
 POST   /api/auth/token/
 POST   /api/auth/token/refresh/
+GET    /api/auth/me/
 
 GET    /api/documents/
 POST   /api/documents/
 GET    /api/documents/<id>/
 DELETE /api/documents/<id>/
+GET    /api/documents/<id>/insights/
+
+GET    /api/documents/<document_id>/chats/
+POST   /api/documents/<document_id>/chats/
+
+GET    /api/chats/<id>/
+DELETE /api/chats/<id>/
+
+GET    /api/chats/<chat_id>/messages/
+POST   /api/chats/<chat_id>/messages/
 ```
 
 Local API:
@@ -96,43 +139,113 @@ Local API:
 http://127.0.0.1:8000/api/
 ```
 
+The complete API contract is maintained in:
+
+```text
+docs/API.md
+```
+
 ---
 
 # AWS / DevOps
 
 Responsibilities:
 
-- IAM
-- S3
-- Bedrock access
 - AWS environment setup
-- CloudWatch
+- IAM
+- Amazon S3
+- Amazon Bedrock access
+- Containerization
+- Docker / Finch
 - Deployment
+- CloudWatch
 - Production configuration
+- AWS security configuration
 
-Coordinate with Backend + AI when S3 and Bedrock integration begins.
+### Planned deployment architecture
+
+```text
+Frontend
+    ↓
+Containerized Django API
+    ↓
+┌───────────────┬───────────────┐
+│      S3       │    Bedrock    │
+│   Documents   │   AI Models   │
+└───────────────┴───────────────┘
+        │
+      IAM
+        │
+   CloudWatch
+```
+
+The deployment target may use ECS/Fargate or ECS Express Mode depending on the final deployment requirements.
+
+### Development strategy
+
+AWS work should be prepared locally first where possible.
+
+```text
+Build locally
+    ↓
+Test locally
+    ↓
+Containerize
+    ↓
+Configure AWS
+    ↓
+Deploy
+    ↓
+Test deployed application
+```
+
+Do not add AWS services simply to increase the number of services used.
+
+Every service should have a real project requirement.
 
 Never commit AWS credentials.
 
 ---
 
-# AI / RAG / QA
+# Testing / QA
 
 Responsibilities:
 
-- PDF extraction
-- Chunking
-- Retrieval
-- Prompt design
-- Strands research
-- Bedrock testing
-- Deadline extraction
-- Action extraction
-- Source attribution
-- Evaluation
-- AI response testing
+- pytest
+- pytest-django
+- API testing
+- Authentication testing
+- Authorization testing
+- Ownership/security testing
+- Document-processing testing
+- Chat-service testing
+- Regression testing
+- AI response evaluation
+- Integration testing
+- CI setup when appropriate
 
-Start with a simple retrieval pipeline.
+### Current automated tests
+
+The backend currently has:
+
+```text
+Authentication       3 tests
+Documents            3 tests
+Chats                6 tests
+Security             7 tests
+Chat service         2 tests
+Document processing  2 tests
+──────────────────────────────
+Total               23 tests
+```
+
+Run:
+
+```bash
+pytest -v
+```
+
+AI-dependent functionality is mocked in the automated tests where appropriate, so the complete test suite does not require Ollama to be running.
 
 ---
 
@@ -252,9 +365,19 @@ Create a branch:
 git checkout -b feature/your-feature
 ```
 
-Examples:
+Recommended branches:
 
-```bash
+```text
+feature/backend
+feature/frontend
+feature/aws
+feature/rag
+feature/tests
+```
+
+More specific branches can be created when needed:
+
+```text
 feature/frontend-dashboard
 feature/bedrock-agent
 feature/aws-deployment
@@ -296,17 +419,19 @@ git status
 
 Make sure no secrets or local files are staged.
 
-Run backend checks:
+Run:
 
 ```bash
 python manage.py check
 ```
 
-Run tests when available:
+Run the test suite:
 
 ```bash
 pytest
 ```
+
+Then push the branch and open a Pull Request.
 
 ---
 
@@ -334,9 +459,9 @@ The team should work independently where possible.
                          ┌── Frontend
                          │
                          ├── AWS / DevOps
-main ────────────────────┼── AI / RAG
+main ────────────────────┼── Backend + AI
                          │
-                         └── Backend
+                         └── Testing / QA
 ```
 
 Do not wait for another component to be completely finished.
@@ -347,7 +472,8 @@ Use:
 Mock UI
 Mock AI responses
 API contracts
-Small integration tests
+Unit tests
+Integration tests
 ```
 
 to keep development moving.
@@ -400,10 +526,52 @@ Agent
     ↓
 Tools / Retrieval
     ↓
-Bedrock
+AI Model
 ```
 
-This keeps the backend easier to test.
+Local development:
+
+```text
+AI Model → Ollama
+```
+
+AWS deployment:
+
+```text
+AI Model → Amazon Bedrock
+```
+
+This separation keeps the backend easier to test and makes local-to-AWS migration simpler.
+
+---
+
+# AWS ↔ Backend
+
+The AWS/DevOps and Backend/AI developers should coordinate around:
+
+```text
+S3
+    ↓
+Document storage
+
+Bedrock
+    ↓
+AI inference
+
+IAM
+    ↓
+AWS permissions
+
+CloudWatch
+    ↓
+Logs / monitoring
+
+Container deployment
+    ↓
+Django API
+```
+
+AWS credentials should never be placed inside the repository.
 
 ---
 
@@ -448,6 +616,10 @@ Grounded Answer
 Source / Page References
 ```
 
+The core experience is:
+
+> **"Tell me what I need to do."**
+
 The goal is not to build the largest system.
 
 The goal is to build a **working, useful document-to-action experience for students**.
@@ -464,6 +636,7 @@ What is ready
 How to test it
 What API/interface is expected
 What is still missing
+Known limitations
 ```
 
 Keep `main` stable and communicate before making changes that affect another team's interface.
