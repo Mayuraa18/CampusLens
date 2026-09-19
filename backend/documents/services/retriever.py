@@ -31,6 +31,99 @@ STOP_WORDS = {
     "on",
     "my",
     "me",
+    "do",
+}
+
+
+QUERY_INTENTS = {
+    "action": {
+        "do",
+        "need",
+        "required",
+        "must",
+        "should",
+        "have",
+        "complete",
+        "requirement",
+        "requirements",
+    },
+    "deadline": {
+        "deadline",
+        "deadlines",
+        "due",
+        "last",
+        "before",
+        "by",
+        "cutoff",
+    },
+    "important_date": {
+        "date",
+        "dates",
+        "schedule",
+        "available",
+        "release",
+        "result",
+        "admit",
+        "exam",
+        "examination",
+    },
+}
+
+
+INTENT_TERMS = {
+    "action": {
+        "submit",
+        "pay",
+        "apply",
+        "register",
+        "upload",
+        "complete",
+        "provide",
+        "attach",
+        "fill",
+        "sign",
+        "attend",
+        "respond",
+        "renew",
+        "download",
+        "collect",
+        "required",
+        "must",
+        "should",
+    },
+    "deadline": {
+        "deadline",
+        "due",
+        "submit",
+        "pay",
+        "apply",
+        "register",
+        "before",
+        "by",
+        "last",
+        "cutoff",
+        "close",
+        "closes",
+    },
+    "important_date": {
+        "date",
+        "schedule",
+        "available",
+        "release",
+        "released",
+        "announcement",
+        "announced",
+        "exam",
+        "examination",
+        "result",
+        "admit",
+        "card",
+        "orientation",
+        "event",
+        "starts",
+        "ends",
+        "opens",
+    },
 }
 
 
@@ -51,37 +144,106 @@ def tokenize(text: str) -> list[str]:
     ]
 
 
+def detect_query_intents(query: str) -> set[str]:
+    """
+    Detect high-level intent from the user's question.
+    """
+
+    query_tokens = set(
+        re.findall(
+            r"\b[a-zA-Z0-9]+\b",
+            query.lower(),
+        )
+    )
+
+    intents = set()
+
+    for intent, indicators in QUERY_INTENTS.items():
+        if query_tokens.intersection(indicators):
+            intents.add(intent)
+
+    return intents
+
+
+def expand_query(query: str) -> list[str]:
+    """
+    Expand a query with terms related to its detected intent.
+    """
+
+    query_tokens = set(tokenize(query))
+    expanded_tokens = set(query_tokens)
+
+    intents = detect_query_intents(query)
+
+    for intent in intents:
+        expanded_tokens.update(
+            INTENT_TERMS[intent]
+        )
+
+    return list(expanded_tokens)
+
+
 def score_chunk(
         query: str,
         query_tokens: list[str],
         chunk_text: str,
 ) -> float:
     """
-    Calculate relevance based on query-term coverage.
+    Calculate relevance using both direct lexical matching
+    and query-intent matching.
     """
 
     if not query_tokens:
         return 0.0
 
     chunk_tokens = set(tokenize(chunk_text))
-    query_tokens_set = set(query_tokens)
 
-    matched_terms = {
-        query_token
-        for query_token in query_tokens_set
+    original_tokens = set(tokenize(query))
+    expanded_tokens = set(query_tokens)
+
+    # Direct query-term matches.
+    direct_matches = {
+        token
+        for token in original_tokens
         if any(
-            query_token in chunk_token
+            token in chunk_token
             for chunk_token in chunk_tokens
         )
     }
 
-    if not matched_terms:
-        return 0.0
-
-    return round(
-        len(matched_terms) / len(query_tokens_set),
-        4,
+    # Expanded intent-term matches.
+    expanded_matches = {
+        token
+        for token in expanded_tokens
+        if token not in original_tokens
+           and any(
+            token in chunk_token
+            for chunk_token in chunk_tokens
         )
+    }
+
+    # Direct matches are stronger evidence than intent matches.
+    direct_score = 0.0
+
+    if original_tokens:
+        direct_score = (
+                len(direct_matches)
+                / len(original_tokens)
+        )
+
+    # Intent matching gives a meaningful score even when
+    # the user's wording differs from the document.
+    intent_score = min(
+        len(expanded_matches) * 0.15,
+        0.60,
+        )
+
+    score = min(
+        direct_score + intent_score,
+        1.0,
+        )
+
+    return round(score, 4)
 
 
 def retrieve_chunks(
@@ -94,7 +256,7 @@ def retrieve_chunks(
     Retrieve the most relevant chunks from a document.
     """
 
-    query_tokens = tokenize(query)
+    query_tokens = expand_query(query)
 
     if not query_tokens:
         return []
