@@ -7,11 +7,25 @@ DEFAULT_CHUNK_OVERLAP = 150
 
 def normalize_text(text: str) -> str:
     """
-    Normalize extracted PDF text before chunking.
+    Normalize text extracted from PDFs before chunking.
     """
+
+    # Remove null/control characters.
     text = text.replace("\x00", " ")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # Preserve words split across a line break:
+    # "require-\naction" -> "require-action"
+    text = re.sub(
+        r"([A-Za-z])-\s*\n\s*([A-Za-z])",
+        r"\1-\2",
+        text,
+    )
+
+    # Convert remaining newlines/tabs to spaces.
+    text = re.sub(r"[\r\n\t]+", " ", text)
+
+    # Normalize repeated whitespace.
+    text = re.sub(r"\s+", " ", text)
 
     return text.strip()
 
