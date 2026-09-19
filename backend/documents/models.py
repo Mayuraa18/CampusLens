@@ -85,3 +85,67 @@ class DocumentChunk(models.Model):
             f"Page {self.page.page_number} - "
             f"Chunk {self.chunk_index}"
         )
+
+class Deadline(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="deadlines",
+    )
+    date = models.CharField(max_length=100)
+    description = models.CharField(max_length=500)
+    page_number = models.PositiveIntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return (
+            f"{self.document.title} - "
+            f"Deadline: {self.date}"
+        )
+
+
+class ImportantDate(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="important_dates",
+    )
+    date = models.CharField(max_length=100)
+    description = models.CharField(max_length=500)
+    page_number = models.PositiveIntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return (
+            f"{self.document.title} - "
+            f"Important Date: {self.date}"
+        )
+
+
+class Action(models.Model):
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="actions",
+    )
+    action = models.CharField(max_length=500)
+    page_number = models.PositiveIntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return (
+            f"{self.document.title} - "
+            f"Action: {self.action}"
+        )
