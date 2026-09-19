@@ -3,21 +3,37 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Document
-from .serializers import DocumentSerializer
+from .serializers import (
+    DocumentDetailSerializer,
+    DocumentSerializer,
+    InsightsSerializer,
+)
 from .services.document_processor import process_document
+from .services.insights import generate_document_insights
 
 
 class DocumentListView(APIView):
     def get(self, request):
-        documents = Document.objects.filter(user=request.user)
-        serializer = DocumentSerializer(documents, many=True)
+        documents = Document.objects.filter(
+            user=request.user,
+        )
+
+        serializer = DocumentSerializer(
+            documents,
+            many=True,
+        )
+
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = DocumentSerializer(data=request.data)
+        serializer = DocumentSerializer(
+            data=request.data,
+        )
 
         if serializer.is_valid():
-            document = serializer.save(user=request.user)
+            document = serializer.save(
+                user=request.user,
+            )
 
             try:
                 process_document(document)
@@ -55,10 +71,13 @@ class DocumentDetailView(APIView):
         except Document.DoesNotExist:
             return Response(
                 {"detail": "Document not found."},
-                status=404,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = DocumentSerializer(document)
+        serializer = DocumentDetailSerializer(
+            document,
+        )
+
         return Response(serializer.data)
 
     def delete(self, request, pk):
@@ -70,8 +89,44 @@ class DocumentDetailView(APIView):
         except Document.DoesNotExist:
             return Response(
                 {"detail": "Document not found."},
-                status=404,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         document.delete()
-        return Response(status=204)
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class DocumentInsightsView(APIView):
+    def get(self, request, pk):
+        try:
+            document = Document.objects.get(
+                pk=pk,
+                user=request.user,
+            )
+        except Document.DoesNotExist:
+            return Response(
+                {"detail": "Document not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if document.status != Document.Status.PROCESSED:
+            return Response(
+                {
+                    "detail": (
+                        "Insights are not available because "
+                        "the document has not finished processing."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        insights = generate_document_insights(document)
+
+        serializer = InsightsSerializer(
+            insights,
+        )
+
+        return Response(serializer.data)

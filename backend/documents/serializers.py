@@ -1,12 +1,43 @@
-from pathlib import Path
-
-from pypdf import PdfReader
 from rest_framework import serializers
 
-from .models import Document
+from .models import (
+    Action,
+    Deadline,
+    Document,
+    ImportantDate,
+)
 
 
-MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10 MB
+class DeadlineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Deadline
+        fields = [
+            "id",
+            "date",
+            "description",
+            "page_number",
+        ]
+
+
+class ImportantDateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImportantDate
+        fields = [
+            "id",
+            "date",
+            "description",
+            "page_number",
+        ]
+
+
+class ActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Action
+        fields = [
+            "id",
+            "action",
+            "page_number",
+        ]
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -27,26 +58,51 @@ class DocumentSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    def validate_file(self, file):
-        if file.size > MAX_DOCUMENT_SIZE:
-            raise serializers.ValidationError(
-                "File size must not exceed 10 MB."
-            )
 
-        extension = Path(file.name).suffix.lower()
+class DocumentDetailSerializer(serializers.ModelSerializer):
+    deadlines = DeadlineSerializer(
+        many=True,
+        read_only=True,
+    )
+    important_dates = ImportantDateSerializer(
+        many=True,
+        read_only=True,
+    )
+    actions = ActionSerializer(
+        many=True,
+        read_only=True,
+    )
 
-        if extension != ".pdf":
-            raise serializers.ValidationError(
-                "Only PDF files are supported."
-            )
+    class Meta:
+        model = Document
+        fields = [
+            "id",
+            "title",
+            "file",
+            "status",
+            "uploaded_at",
+            "updated_at",
+            "deadlines",
+            "important_dates",
+            "actions",
+        ]
 
-        try:
-            PdfReader(file)
-        except Exception as exc:
-            raise serializers.ValidationError(
-                "The uploaded file is not a valid or readable PDF."
-            ) from exc
-
-        file.seek(0)
-
-        return file
+class InsightsSerializer(serializers.Serializer):
+    summary = serializers.CharField(
+        read_only=True,
+    )
+    stats = serializers.DictField(
+        read_only=True,
+    )
+    deadlines = DeadlineSerializer(
+        many=True,
+        read_only=True,
+    )
+    important_dates = ImportantDateSerializer(
+        many=True,
+        read_only=True,
+    )
+    actions = ActionSerializer(
+        many=True,
+        read_only=True,
+    )
