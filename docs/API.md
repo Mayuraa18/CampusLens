@@ -1,118 +1,105 @@
 # CampusLens API Documentation
 
-This document describes the current backend API and the planned AI endpoints.
-
 ## Base URL
 
-Local development:
+`http://127.0.0.1:8000/api/`
 
-```text
-http://127.0.0.1:8000/api/
-```
+Protected endpoints require:
 
-All protected endpoints require a JWT access token unless explicitly stated otherwise.
-
-```http
-Authorization: Bearer <access-token>
-```
+`Authorization: Bearer <access_token>`
 
 ---
 
-## Authentication
+# 1. Authentication
 
-### Obtain JWT Token
+## Register
 
-```http
-POST /api/auth/token/
-Content-Type: application/json
-```
+`POST /auth/register/`
 
 Request:
 
 ```json
 {
-  "username": "your-username",
-  "password": "your-password"
+  "username": "student",
+  "email": "student@example.com",
+  "password": "TestPassword123!"
 }
 ```
 
-Response:
+## Login
 
-```json
-{
-  "refresh": "<refresh-token>",
-  "access": "<access-token>"
-}
-```
-
-### Refresh JWT Token
-
-```http
-POST /api/auth/token/refresh/
-Content-Type: application/json
-```
+`POST /auth/token/`
 
 Request:
 
 ```json
 {
-  "refresh": "<refresh-token>"
+  "username": "student",
+  "password": "TestPassword123!"
 }
 ```
 
-Response:
+Success:
 
 ```json
 {
-  "access": "<new-access-token>"
+  "refresh": "<refresh_token>",
+  "access": "<access_token>"
 }
 ```
 
-### Planned: Current User
+## Refresh Token
 
-```http
-GET /api/auth/me/
+`POST /auth/token/refresh/`
+
+Request:
+
+```json
+{
+  "refresh": "<refresh_token>"
+}
 ```
 
-Status: **Not implemented yet.**
+## Current User
+
+`GET /auth/me/`
+
+Authentication required.
 
 ---
 
-# Documents
+# 2. Documents
 
-## List User Documents
+## List Documents
 
-```http
-GET /api/documents/
-Authorization: Bearer <access-token>
-```
+`GET /documents/`
+
+Authentication required.
 
 Returns only documents belonging to the authenticated user.
 
-Example response:
+Example:
 
 ```json
 [
   {
-    "id": 1,
-    "title": "Exam Circular",
-    "file": "/media/documents/exam_circular.pdf",
-    "status": "uploaded",
-    "uploaded_at": "2026-09-18T00:00:00Z",
-    "updated_at": "2026-09-18T00:00:00Z"
+    "id": 9,
+    "title": "Examination Notice",
+    "file": "/media/documents/exam_notice.pdf",
+    "status": "processed",
+    "uploaded_at": "2026-09-20T10:00:00Z",
+    "updated_at": "2026-09-20T10:01:00Z"
   }
 ]
 ```
 
----
-
 ## Upload Document
 
-```http
-POST /api/documents/
-Authorization: Bearer <access-token>
-Content-Type: multipart/form-data
-```
+`POST /documents/`
+
+Authentication required.
+
+Content type: `multipart/form-data`
 
 Form fields:
 
@@ -121,233 +108,315 @@ title
 file
 ```
 
+Validation:
+- Must be a PDF.
+- Maximum size: 10 MB.
+
+The backend extracts document pages, text chunks, deadlines, important dates, and required actions.
+
+## Get Document Details
+
+`GET /documents/<id>/`
+
+Authentication required.
+
 Example:
 
-```text
-title = Exam Circular
-file = exam_circular.pdf
-```
-
-Do **not** send a `user` field.
-
-The backend assigns ownership from the authenticated request user.
-
-Current response:
-
 ```json
 {
-  "id": 1,
-  "title": "Exam Circular",
-  "file": "/media/documents/exam_circular.pdf",
-  "status": "uploaded",
-  "uploaded_at": "2026-09-18T00:00:00Z",
-  "updated_at": "2026-09-18T00:00:00Z"
-}
-```
-
-### Current status values
-
-```text
-uploaded
-processing
-processed
-failed
-```
-
-The processing states are part of the model and will be used by the document-processing pipeline.
-
----
-
-## Retrieve Document
-
-```http
-GET /api/documents/<id>/
-Authorization: Bearer <access-token>
-```
-
-Returns a document only if it belongs to the authenticated user.
-
-If the document does not exist or belongs to another user:
-
-```json
-{
-  "detail": "Document not found."
-}
-```
-
-Status:
-
-```text
-404 Not Found
-```
-
----
-
-## Delete Document
-
-```http
-DELETE /api/documents/<id>/
-Authorization: Bearer <access-token>
-```
-
-Successful response:
-
-```text
-204 No Content
-```
-
-Deleting a document also deletes its related chats and messages through Django cascade relationships.
-
----
-
-# Conversations
-
-Conversation database models currently exist, but conversation API endpoints are not implemented yet.
-
-Planned endpoints:
-
-```text
-GET    /api/documents/<id>/chats/
-POST   /api/documents/<id>/chats/
-GET    /api/chats/<id>/
-DELETE /api/chats/<id>/
-
-GET    /api/chats/<id>/messages/
-POST   /api/chats/<id>/messages/
-```
-
----
-
-# AI Endpoints — Planned
-
-The AI API should eventually expose functionality similar to:
-
-```text
-POST /api/documents/<id>/process/
-GET  /api/documents/<id>/analysis/
-POST /api/documents/<id>/ask/
-```
-
-These endpoints are **planned, not currently implemented**.
-
-A target structured AI response is:
-
-```json
-{
-  "summary": "...",
+  "id": 9,
+  "title": "Examination Notice",
+  "file": "/media/documents/exam_notice.pdf",
+  "status": "processed",
   "deadlines": [
     {
-      "title": "Registration deadline",
-      "date": "2026-10-20",
-      "source": {
-        "page": 2
-      }
+      "id": 1,
+      "date": "20 October 2026",
+      "description": "Submit examination form",
+      "page_number": 1
+    }
+  ],
+  "important_dates": [
+    {
+      "id": 1,
+      "date": "25 October 2026",
+      "description": "Admit card available",
+      "page_number": 1
     }
   ],
   "actions": [
     {
-      "action": "Complete examination registration",
-      "source": {
-        "page": 2
-      }
-    }
-  ],
-  "answer": "...",
-  "sources": [
-    {
-      "page": 2,
-      "text": "..."
+      "id": 1,
+      "action": "Submit examination form",
+      "page_number": 1
     }
   ]
 }
 ```
 
-The exact schema will be finalized when the AI pipeline is implemented.
+## Delete Document
+
+`DELETE /documents/<id>/`
+
+Authentication required.
+
+Success: `204 No Content`
 
 ---
 
-# Error Handling
+# 3. Document Insights
 
-Expected authentication errors:
+## Get Insights
 
-```text
-401 Unauthorized
-```
+`GET /documents/<id>/insights/`
 
-Expected missing-resource errors:
+Authentication required.
 
-```text
-404 Not Found
-```
-
-Expected validation errors:
-
-```text
-400 Bad Request
-```
-
-Frontend developers should handle:
-
-- Loading
-- Success
-- Validation errors
-- Authentication errors
-- Not found
-- Server errors
-- Empty document lists
-- Document processing states
-
----
-
-# Ownership and Security
-
-The client must never decide document ownership.
-
-Bad:
+Example:
 
 ```json
 {
-  "title": "Circular",
-  "file": "...",
-  "user": 5
+  "summary": "2 deadlines identified. 2 required actions identified. 1 important date identified.",
+  "stats": {
+    "deadlines": 2,
+    "important_dates": 1,
+    "actions": 2
+  },
+  "deadlines": [
+    {
+      "id": 1,
+      "date": "20 October 2026",
+      "description": "Submit examination form",
+      "page_number": 1
+    },
+    {
+      "id": 2,
+      "date": "22 October 2026",
+      "description": "Pay examination fee",
+      "page_number": 1
+    }
+  ],
+  "important_dates": [
+    {
+      "id": 1,
+      "date": "25 October 2026",
+      "description": "Admit card available",
+      "page_number": 1
+    }
+  ],
+  "actions": [
+    {
+      "id": 1,
+      "action": "Submit examination form",
+      "page_number": 1
+    },
+    {
+      "id": 2,
+      "action": "Pay examination fee",
+      "page_number": 1
+    }
+  ]
 }
 ```
 
-Correct:
-
-```json
-{
-  "title": "Circular",
-  "file": "..."
-}
-```
-
-The backend uses:
-
-```python
-request.user
-```
-
-to determine ownership.
-
-This prevents one authenticated user from requesting another user's documents through the normal document endpoints.
+If processing is incomplete: `409 Conflict`
 
 ---
 
-# Development Notes
+# 4. Chats
 
-The API is currently optimized for local MVP development.
+## List Document Chats
 
-Current storage:
+`GET /documents/<document_id>/chats/`
 
-```text
-SQLite + Django FileField
+Authentication required.
+
+## Create Chat
+
+`POST /documents/<document_id>/chats/`
+
+Request:
+
+```json
+{
+  "title": "Exam Notice Chat"
+}
 ```
 
-Planned production storage:
+Success:
 
-```text
-Amazon S3
+```json
+{
+  "id": 2,
+  "document": 9,
+  "title": "Exam Notice Chat",
+  "created_at": "2026-09-20T10:00:00Z",
+  "updated_at": "2026-09-20T10:00:00Z"
+}
 ```
 
-The API contract may evolve as Strands, Bedrock, retrieval, and frontend integration are implemented.
+## Get Chat
+
+`GET /chats/<id>/`
+
+Authentication required.
+
+Returns the chat and message history.
+
+## Delete Chat
+
+`DELETE /chats/<id>/`
+
+Authentication required.
+
+Success: `204 No Content`
+
+---
+
+# 5. Chat Messages
+
+## Get Messages
+
+`GET /chats/<chat_id>/messages/`
+
+Authentication required.
+
+Example:
+
+```json
+[
+  {
+    "id": 1,
+    "role": "user",
+    "content": "What do I need to do?",
+    "created_at": "2026-09-20T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "role": "assistant",
+    "content": "You need to submit the examination form. [Source: Page 1]",
+    "created_at": "2026-09-20T10:00:02Z"
+  }
+]
+```
+
+## Send Message
+
+`POST /chats/<chat_id>/messages/`
+
+Authentication required.
+
+Request:
+
+```json
+{
+  "content": "What do I need to do?"
+}
+```
+
+Maximum message length: `10,000 characters`
+
+Success:
+
+```json
+{
+  "user_message": {
+    "id": 1,
+    "role": "user",
+    "content": "What do I need to do?",
+    "created_at": "2026-09-20T10:00:00Z"
+  },
+  "assistant_message": {
+    "id": 2,
+    "role": "assistant",
+    "content": "You need to submit the examination form. [Source: Page 1]",
+    "created_at": "2026-09-20T10:00:02Z"
+  },
+  "sources": [
+    {
+      "page_number": 1
+    }
+  ]
+}
+```
+
+AI failure:
+
+```json
+{
+  "detail": "Unable to generate an AI response."
+}
+```
+
+HTTP status: `500`
+
+---
+
+# 6. HTTP Status Codes
+
+| Status | Meaning |
+|---|---|
+| `200` | Successful request |
+| `201` | Resource created |
+| `204` | Resource deleted |
+| `400` | Invalid request |
+| `401` | Authentication required or invalid |
+| `404` | Resource not found or inaccessible |
+| `409` | Document processing is not complete |
+| `500` | Internal or AI processing error |
+
+---
+
+# 7. Security and Ownership
+
+CampusLens enforces user ownership at the API level.
+
+Users cannot:
+- Access another user's documents.
+- Delete another user's documents.
+- Access another user's chats.
+- Read another user's messages.
+- Send messages to another user's chats.
+
+Unauthorized resources return `404 Not Found`.
+
+---
+
+# 8. Frontend Application Flow
+
+```text
+Register / Login
+       ↓
+Dashboard
+       ↓
+Upload PDF
+       ↓
+Document Processing
+       ↓
+Document Details
+       ↓
+Insights
+   ├── Summary
+   ├── Required Actions
+   ├── Deadlines
+   └── Important Dates
+       ↓
+Create Chat
+       ↓
+Ask Question
+       ↓
+AI Answer + Source Page
+```
+
+## Primary CampusLens Interaction
+
+The document page should prominently provide:
+
+`What do I need to do?`
+
+The response should prioritize:
+1. Required actions
+2. Corresponding deadlines
+3. Relevant source pages
+
+Informational dates should remain separate from required actions unless the document explicitly requires the student to perform an action.
