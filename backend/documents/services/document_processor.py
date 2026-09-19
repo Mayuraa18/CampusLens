@@ -1,6 +1,7 @@
 from django.db import transaction
 
 from documents.models import Document, DocumentPage
+from documents.services.chunking import chunk_text
 from documents.services.pdf_processor import (
     PDFProcessingError,
     extract_pdf_content,
@@ -9,7 +10,8 @@ from documents.services.pdf_processor import (
 
 def process_document(document: Document) -> None:
     """
-    Extract text from a document and store it page by page.
+    Extract text from a PDF, store it page by page,
+    and create chunks for each page.
     """
 
     document.status = Document.Status.PROCESSING
@@ -19,18 +21,32 @@ def process_document(document: Document) -> None:
         pages = extract_pdf_content(document.file.path)
 
         with transaction.atomic():
-            DocumentPage.objects.filter(document=document).delete()
+            DocumentPage.objects.filter(
+                document=document
+            ).delete()
 
-            DocumentPage.objects.bulk_create(
-                [
-                    DocumentPage(
-                        document=document,
-                        page_number=page["page_number"],
-                        text=page["text"],
-                    )
-                    for page in pages
-                ]
-            )
+            for page in pages:
+                document_page = DocumentPage.objects.create(
+                    document=document,
+                    page_number=page["page_number"],
+                    text=page["text"],
+                )
+
+                chunks = chunk_text(page["text"])
+
+                # Import here to keep model dependencies simple.
+                from documents.models import DocumentChunk
+
+                DocumentChunk.objects.bulk_create(
+                    [
+                        DocumentChunk(
+                            page=document_page,
+                            chunk_index=chunk_index,
+                            text=chunk,
+                        )
+                        for chunk_index, chunk in enumerate(chunks)
+                    ]
+                )
 
             document.status = Document.Status.PROCESSED
             document.save(update_fields=["status", "updated_at"])

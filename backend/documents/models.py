@@ -60,3 +60,28 @@ class DocumentPage(models.Model):
 
     def __str__(self):
         return f"{self.document.title} - Page {self.page_number}"
+
+class DocumentChunk(models.Model):
+    page = models.ForeignKey(
+        DocumentPage,
+        on_delete=models.CASCADE,
+        related_name="chunks",
+    )
+    chunk_index = models.PositiveIntegerField()
+    text = models.TextField()
+
+    class Meta:
+        ordering = ["page__page_number", "chunk_index"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["page", "chunk_index"],
+                name="unique_page_chunk",
+            )
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.page.document.title} - "
+            f"Page {self.page.page_number} - "
+            f"Chunk {self.chunk_index}"
+        )
