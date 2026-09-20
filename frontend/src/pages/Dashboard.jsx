@@ -1,0 +1,27 @@
+import { useEffect, useRef, useState } from 'react'
+import { animate, stagger } from 'animejs'
+import Icon from '../components/Icon'
+import UploadCard from '../components/UploadCard'
+import { featureCards } from '../data/homeData'
+import { getDocumentInsights } from '../services/api'
+
+function greetingForHour(hour) { if (hour < 5) return 'Good Night'; if (hour < 12) return 'Good Morning'; if (hour < 17) return 'Good Afternoon'; if (hour < 21) return 'Good Evening'; return 'Good Night' }
+
+function Dashboard({ onUpload, onNavigate, isUploading, user, documentCount, documents = [] }) {
+  const [greeting, setGreeting] = useState(() => greetingForHour(new Date().getHours()))
+  const [latestInsights, setLatestInsights] = useState(null)
+  const cardsRef = useRef(null)
+  useEffect(() => { const timer = window.setInterval(() => setGreeting(greetingForHour(new Date().getHours())), 60000); return () => window.clearInterval(timer) }, [])
+  useEffect(() => { if (!cardsRef.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined; const animation = animate(cardsRef.current.children, { opacity: [0, 1], translateY: [18, 0], delay: stagger(100), duration: 560, ease: 'outExpo' }); return () => animation.revert() }, [])
+  useEffect(() => { let active = true; const latest = documents.find(document => document.status === 'Ready'); setLatestInsights(null); if (!latest) return undefined; getDocumentInsights(latest.id).then(insights => { if (active) setLatestInsights({ document: latest, insights }) }).catch(() => {}); return () => { active = false } }, [documents])
+  const deadline = latestInsights?.insights?.deadlines?.[0]
+  const action = latestInsights?.insights?.actions?.[0]
+  const attention = deadline ? `${deadline.description} — ${deadline.date}.` : action ? action.action : documentCount ? `You have ${documentCount} uploaded ${documentCount === 1 ? 'document' : 'documents'}. Open your shelf to review the latest one.` : 'Upload your first campus document to begin building your personal study shelf.'
+  return <div className="dashboard-light min-h-screen px-5 py-8 sm:px-8 lg:px-10 lg:py-10"><div className="mx-auto max-w-6xl"><header><p className="text-xs font-extrabold uppercase tracking-[.18em] text-[#5c7c45]">Your CampusLens space</p><h1 className="editorial-font mt-2 text-4xl leading-none tracking-[-.055em] text-[#1b3a25] sm:text-5xl">{greeting}{user?.username ? `, ${user.username}` : ''}.</h1><p className="mt-4 max-w-xl text-sm leading-6 text-[#5d7160]">Your documents, useful next steps and campus possibilities—kept in one calm place.</p></header>
+    <section ref={cardsRef} className="mt-7 grid gap-4 md:grid-cols-2"><article className="dashboard-stat-card"><p className="text-xs font-bold uppercase tracking-[.15em] text-[#5c7c45]">Documents</p><p className="editorial-font mt-4 text-6xl leading-none text-[#1d422a]">{String(documentCount).padStart(2, '0')}</p><p className="mt-2 text-sm text-[#57705a]">{documentCount === 1 ? 'document uploaded' : 'documents uploaded'}</p></article><article className="dashboard-attention-card"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#d7f46d] text-[#244127]"><Icon name="calendar" className="size-5" /></span><div><p className="text-xs font-bold uppercase tracking-[.15em] text-[#5c7c45]">What needs attention</p><h2 className="display-font mt-2 text-xl font-bold text-[#1d422a]">{deadline ? 'Extracted deadline' : action ? 'Required action' : 'Your document shelf'}</h2><p className="mt-2 text-sm leading-6 text-[#5d7160]">{attention}</p>{latestInsights && <p className="mt-2 text-xs font-semibold text-[#567241]">From {latestInsights.document.title}</p>}</div></div><button onClick={() => onNavigate('documents')} className="mt-5 text-sm font-bold text-[#426b2d]">View documents →</button></article></section>
+    <div className="mt-6"><UploadCard onUpload={onUpload} isUploading={isUploading} /></div>
+    <section className="mt-9"><div><p className="text-xs font-bold uppercase tracking-[.15em] text-[#5c7c45]">Quick shortcuts</p><h2 className="editorial-font mt-2 text-3xl text-[#1d422a]">What do you need?</h2></div><div className="mt-4 grid gap-3 md:grid-cols-3">{featureCards.map(card => <button key={card.title} onClick={() => onNavigate(card.title === 'Ask CampusLens' ? 'chat' : card.title === 'Find a resource' ? 'documents' : 'documents')} className="dashboard-shortcut text-left"><span className="grid size-10 place-items-center rounded-xl bg-[#dcebc4] text-[#315438]"><Icon name={card.icon} className="size-5" /></span><h3 className="display-font mt-6 text-lg font-bold text-[#1d422a]">{card.title}</h3><p className="mt-2 text-sm leading-5 text-[#607560]">{card.description}</p><span className="mt-5 inline-block text-sm font-bold text-[#507638]">{card.action} →</span></button>)}</div></section>
+    <section className="mt-8 rounded-[26px] border border-[#b9cda4] bg-[#edf1df] p-5 sm:p-6"><div className="flex items-start justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[.15em] text-[#d27e5e]">Community update</p><h2 className="editorial-font mt-2 text-2xl text-[#1d422a]">Campus community is coming soon.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-[#607560]">Student-community posts and event updates are not available from the current backend yet. This space will surface them when that data is connected.</p></div><span className="text-3xl text-[#d27e5e]">✦</span></div></section>
+  </div></div>
+}
+export default Dashboard
