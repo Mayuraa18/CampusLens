@@ -7,11 +7,9 @@ from documents.models import (
     DocumentPage,
     ImportantDate,
 )
-from documents.services.action_extractor import extract_actions
 from documents.services.chunking import chunk_text
-from documents.services.deadline_extractor import extract_deadlines
-from documents.services.important_date_extractor import (
-    extract_important_dates,
+from documents.services.document_intelligence import (
+    extract_document_intelligence,
 )
 from documents.services.pdf_processor import (
     PDFProcessingError,
@@ -21,22 +19,51 @@ from documents.services.pdf_processor import (
 
 def process_document(document):
     """
-    Process an uploaded document and store its extracted information.
+    Process an uploaded document.
 
-    Database write transactions are intentionally kept short so that
-    long-running LLM/Ollama operations do not hold SQLite write locks.
+    Processing is split into short database transactions so that
+    long-running LLM operations do not hold SQLite write locks.
+
+    Pipeline:
+
+    1. Mark document as PROCESSING.
+    2. Extract PDF pages.
+    3. Save pages and chunks in a short transaction.
+    4. Run ONE LLM call to extract:
+       - deadlines
+       - important dates
+       - required actions
+    5. Save extracted intelligence in a second short transaction.
+    6. Mark document as PROCESSED.
+
+    If processing fails, the document is marked as FAILED.
     """
 
-    # 1. Mark document as PROCESSING.
+    # ---------------------------------------------------------
+    # 1. Mark document as processing
+    # ---------------------------------------------------------
+
     document.status = document.Status.PROCESSING
-    document.save(update_fields=["status", "updated_at"])
+    document.save(
+        update_fields=["status", "updated_at"],
+    )
 
     try:
-        # 2. Extract PDF content outside any database transaction.
-        pages = extract_pdf_content(document.file.path)
+        # -----------------------------------------------------
+        # 2. Extract PDF content
+        # -----------------------------------------------------
 
-        # 3. Save pages and chunks inside a SHORT transaction.
-        # 4. This transaction is committed BEFORE any LLM/Ollama call.
+        pages = extract_pdf_content(
+            document.file.path,
+        )
+
+        # -----------------------------------------------------
+        # 3. Save pages and chunks
+        #
+        # Keep this transaction short.
+        # No LLM calls happen inside this transaction.
+        # -----------------------------------------------------
+
         with transaction.atomic():
             DocumentPage.objects.filter(
                 document=document,
@@ -49,7 +76,9 @@ def process_document(document):
                     text=page["text"],
                 )
 
-                chunks = chunk_text(page["text"])
+                chunks = chunk_text(
+                    page["text"],
+                )
 
                 DocumentChunk.objects.bulk_create(
                     [
@@ -62,22 +91,33 @@ def process_document(document):
                     ]
                 )
 
-        # 5. Perform all LLM/Ollama processing AFTER the first
-        #    database transaction has completely finished.
+        # -----------------------------------------------------
+        # 4. ONE LLM CALL
+        #
+        # This replaces:
+        #
+        # extract_deadlines()
+        # extract_important_dates()
+        # extract_actions()
+        #
+        # with one unified extraction call.
+        # -----------------------------------------------------
 
-        deadlines = extract_deadlines(document)
-
-        important_dates = extract_important_dates(
-            document=document,
-            deadlines=deadlines,
+        intelligence = extract_document_intelligence(
+            document,
         )
 
-        actions = extract_actions(document)
+        deadlines = intelligence["deadlines"]
+        important_dates = intelligence["important_dates"]
+        actions = intelligence["actions"]
 
-        # 6. Save AI-extracted results inside another SHORT transaction.
+        # -----------------------------------------------------
+        # 5. Save extracted intelligence
+        #
+        # Keep this transaction short as well.
+        # -----------------------------------------------------
+
         with transaction.atomic():
-            # Remove previous extracted intelligence so re-processing
-            # does not create duplicates.
             Deadline.objects.filter(
                 document=document,
             ).delete()
@@ -90,7 +130,6 @@ def process_document(document):
                 document=document,
             ).delete()
 
-            # Save deadlines.
             Deadline.objects.bulk_create(
                 [
                     Deadline(
@@ -99,11 +138,10 @@ def process_document(document):
                         description=deadline["description"],
                         page_number=deadline["page"],
                     )
-                    for deadline in deadlines.get("deadlines", [])
+                    for deadline in deadlines
                 ]
             )
 
-            # Save important dates.
             ImportantDate.objects.bulk_create(
                 [
                     ImportantDate(
@@ -112,14 +150,10 @@ def process_document(document):
                         description=important_date["description"],
                         page_number=important_date["page"],
                     )
-                    for important_date in important_dates.get(
-                    "important_dates",
-                    []
-                )
+                    for important_date in important_dates
                 ]
             )
 
-            # Save actions.
             Action.objects.bulk_create(
                 [
                     Action(
@@ -127,24 +161,38 @@ def process_document(document):
                         action=action["action"],
                         page_number=action["page"],
                     )
-                    for action in actions.get("actions", [])
+                    for action in actions
                 ]
             )
 
-            # Mark as processed only after everything has been saved.
+            # -------------------------------------------------
+            # 6. Mark document as processed
+            # -------------------------------------------------
+
             document.status = document.Status.PROCESSED
             document.save(
-                update_fields=["status", "updated_at"],
+                update_fields=[
+                    "status",
+                    "updated_at",
+                ],
             )
 
     except PDFProcessingError:
-        # 8. Mark failed and re-raise the original exception.
         document.status = document.Status.FAILED
-        document.save(update_fields=["status", "updated_at"])
+        document.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ],
+        )
         raise
 
     except Exception:
-        # 9. Mark failed and re-raise the original exception.
         document.status = document.Status.FAILED
-        document.save(update_fields=["status", "updated_at"])
+        document.save(
+            update_fields=[
+                "status",
+                "updated_at",
+            ],
+        )
         raise
