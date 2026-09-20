@@ -1,7 +1,6 @@
 import pytest
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from documents.services.pdf_processor import PDFProcessingError
 
 from documents.models import (
     Action,
@@ -12,6 +11,7 @@ from documents.models import (
     ImportantDate,
 )
 from documents.services.document_processor import process_document
+from documents.services.pdf_processor import PDFProcessingError
 
 
 @pytest.mark.django_db
@@ -49,7 +49,7 @@ def test_process_document_persists_extracted_data(monkeypatch):
     def mock_chunk_text(text):
         return [text]
 
-    def mock_extract_deadlines(document):
+    def mock_extract_document_intelligence(document):
         return {
             "deadlines": [
                 {
@@ -62,22 +62,14 @@ def test_process_document_persists_extracted_data(monkeypatch):
                     "description": "Pay examination fee",
                     "page": 1,
                 },
-            ]
-        }
-
-    def mock_extract_important_dates(document, deadlines):
-        return {
+            ],
             "important_dates": [
                 {
                     "date": "25 October 2026",
                     "description": "Admit card available",
                     "page": 1,
                 }
-            ]
-        }
-
-    def mock_extract_actions(document):
-        return {
+            ],
             "actions": [
                 {
                     "action": "Submit examination form",
@@ -87,7 +79,7 @@ def test_process_document_persists_extracted_data(monkeypatch):
                     "action": "Pay examination fee",
                     "page": 1,
                 },
-            ]
+            ],
         }
 
     monkeypatch.setattr(
@@ -101,18 +93,8 @@ def test_process_document_persists_extracted_data(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "documents.services.document_processor.extract_deadlines",
-        mock_extract_deadlines,
-    )
-
-    monkeypatch.setattr(
-        "documents.services.document_processor.extract_important_dates",
-        mock_extract_important_dates,
-    )
-
-    monkeypatch.setattr(
-        "documents.services.document_processor.extract_actions",
-        mock_extract_actions,
+        "documents.services.document_processor.extract_document_intelligence",
+        mock_extract_document_intelligence,
     )
 
     process_document(document)
@@ -162,6 +144,7 @@ def test_process_document_persists_extracted_data(monkeypatch):
         "Submit examination form",
         "Pay examination fee",
     }
+
 
 @pytest.mark.django_db
 def test_process_document_marks_failed_on_pdf_error(
